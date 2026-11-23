@@ -12,13 +12,18 @@
       ? 'Última consulta respondida; pendiente de revisión crítica'
       : 'Servicio remoto configurado · Consulta por validar';
     const catalog = new Map(D.products.map(p => [p.id, p]));
-    const topThree = (metric, formatter) => rank(filtered, 'pid', metric).slice(0, 3)
-      .map((r, i) => (i + 1) + '. ' + esc(productLabel(catalog.get(r.key))) + ' — ' + formatter(r))
-      .join('<br>');
     const usd = n => new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(n / 100);
-    const verifiedRanks = '<div class="note"><strong>Referencias verificadas por cálculos del dashboard (no por IA)</strong>' +
-      '<p class="small"><strong>Mayor utilidad bruta:</strong><br>' + topThree('profit', r => usd(r.profit)) + '</p>' +
-      '<p class="small"><strong>Mayor margen bruto:</strong><br>' + topThree('margin', r => r.margin.toFixed(2) + ' %') + '</p></div>';
+    const rows = (metric) => rank(filtered, 'pid', metric).slice(0, 3)
+      .map((r, i) => (i + 1) + '. ' + esc(productLabel(catalog.get(r.key))) +
+        ' · Ventas: ' + usd(r.sales) + ' · Utilidad: ' + usd(r.profit) +
+        ' · Margen: ' + (r.margin === null ? 'Sin datos' : r.margin.toFixed(2) + ' %')).join('<br>');
+    const totals = agg(filtered);
+    const verifiedRanks = '<div class="note"><strong>Resultados verificados por cálculos del dashboard (no por IA)</strong>' +
+      '<p class="small">Ventas netas: ' + usd(totals.sales) + ' · Utilidad bruta: ' + usd(totals.profit) +
+      ' · Margen bruto: ' + (totals.margin === null ? 'Sin datos' : totals.margin.toFixed(2) + ' %') + '</p>' +
+      '<p class="small"><strong>Top 3 por utilidad bruta:</strong><br>' + rows('profit') + '</p>' +
+      '<p class="small"><strong>Top 3 por margen bruto:</strong><br>' + rows('margin') +
+      '</p><p class="small">Estas tablas se recalculan al cambiar filtros o cargar datos. Úsalas para contrastar cualquier recomendación de IA.</p></div>';
     return '<div class="note warning">La IA genera propuestas que el equipo debe contrastar con las tablas. Su respuesta no sustituye los indicadores ni demuestra causalidad.</div>' + verifiedRanks +
       card('IA mediante Cloudflare Workers AI', 'No descarga modelos en tu equipo y no necesita claves de API en el navegador.',
         '<div class="airow"><span class="tag" id="aiStatus">' + esc(status) + '</span>' +
@@ -61,10 +66,7 @@
     context.rankingProductosPorUtilidadBrutaUSD = listing('profit');
     context.rankingProductosPorMargenBrutoPct = listing('margin');
     context.rankingProductosPorVentasNetasUSD = listing('sales');
-    context.instruccionesParaRankings =
-      'Las listas rankingProductosPor... están ORDENADAS de mayor a menor; los puestos son verificables. ' +
-      'Para cualquier top 3 copia exactamente los puestos 1, 2 y 3 de la lista del indicador solicitado. ' +
-      'No confundas margen en porcentaje con utilidad en USD. Si no hay datos para una afirmación, dilo.';
+    context.definicionRankings = 'Clasificaciones calculadas a partir de ventas filtradas y ordenadas de mayor a menor. No son conclusiones generadas por IA.';
     return context;
   };
 
@@ -78,6 +80,12 @@
     const context = JSON.stringify(compactContext(question));
     if (context.length > 12000) { toast('El contexto es demasiado extenso para el servicio.'); return; }
     const version = dataVersion, scope = JSON.stringify(selection());
+    const advisoryQuestion =
+      'Pregunta original del usuario: ' + question.slice(0, 440) + '\n' +
+      'El dashboard ya presenta cifras exactas y clasificaciones verificadas junto a esta consulta. ' +
+      'Genera SOLO dos propuestas comerciales concretas expresadas como HIPÓTESIS, con una validación para cada una. ' +
+      'NO enumeres productos por posición, NO repitas nombres como un ranking, NO redactes importes, porcentajes ni otras cifras. ' +
+      'No inventes causas; reconoce qué datos faltan. Formato: Propuesta A, Qué comprobar; Propuesta B, Qué comprobar.';
     aiBusy = true;
     input.disabled = true;
     byId('askAI').disabled = true;
@@ -88,17 +96,25 @@
       const response = await fetch(ENDPOINT, {
         method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, context }),
+        body: JSON.stringify({ question: advisoryQuestion.slice(0, 1000), context }),
         signal: controller.signal
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || ('Error HTTP ' + response.status));
       const answer = typeof payload.respuesta === 'string' ? payload.respuesta.trim() : '';
       if (!answer) throw new Error('El modelo no devolvió una respuesta de texto.');
-      aiReply = answer;
+      // Proteger los datos auditables: el modelo solo aporta hipótesis, nunca cifras.
+      if (/[\$€%]/.test(answer) || /\b\d+[.,]\d{2,}\b/.test(answer) || /\b(?:USD|EUR)\b/i.test(answer)) {
+        aiReply = 'La IA intentó introducir cifras o porcentajes que no pueden validarse automáticamente. Se omite esa respuesta. Consulta únicamente los resultados verificados de arriba y repite la solicitud de propuestas sin cifras.';
+        aiReplyScope = 'Respuesta de IA rechazada por incluir afirmaciones numéricas; no utilizar como evidencia.';
+      } else {
+        aiReply = 'HIPÓTESIS Y ACCIONES GENERADAS POR IA (pendientes de revisión del equipo):\n\n' + answer;
+        aiReplyScope = 'Modelo: ' + MODEL_LABEL + ' · Filtros: ' + scope + ' · Pregunta original: ' + question +
+          ' · Las cifras y los rankings provienen exclusivamente del cálculo determinista.';
+      }
       aiVersion = version;
       modelName = MODEL_LABEL;
-      aiReplyScope = 'Modelo: ' + MODEL_LABEL + ' · Filtros: ' + scope + ' · Pregunta: ' + question;
+
     } catch (e) {
       aiReply = 'La consulta no se completó: ' + (e.name === 'AbortError' ? 'el servidor no respondió dentro del límite de tiempo' : (e.message || 'error de red')) + '. No hay una recomendación validada.';
       aiVersion = version;
@@ -109,5 +125,5 @@
       if (current === 'assistant') render();
     }
   };
-  window.CrustRemoteAI = { provider: 'Cloudflare Workers AI', endpoint: ENDPOINT, version: 'V2' };
+  window.CrustRemoteAI = { provider: 'Cloudflare Workers AI', endpoint: ENDPOINT, version: 'V2.1' };
 })();
