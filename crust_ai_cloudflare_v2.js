@@ -18,12 +18,21 @@
         ' · Ventas: ' + usd(r.sales) + ' · Utilidad: ' + usd(r.profit) +
         ' · Margen: ' + (r.margin === null ? 'Sin datos' : r.margin.toFixed(2) + ' %')).join('<br>');
     const totals = agg(filtered);
+    const share = n => totals.sales ? (n / totals.sales * 100).toFixed(2) + ' %' : 'Sin datos';
+    const rankedDimensions = dim => rank(filtered, dim, 'sales')
+      .map(row => esc(row.key) + ': ' + share(row.sales)).join(' · ');
+    const topline = rank(filtered, 'pid', 'units').slice(0, 3)
+      .map((row, i) => (i + 1) + '. ' + esc(productLabel(catalog.get(row.key))) +
+        ' · ' + row.units.toLocaleString('es-EC') + ' unidades').join('<br>');
     const verifiedRanks = '<div class="note"><strong>Resultados verificados por cálculos del dashboard (no por IA)</strong>' +
       '<p class="small">Ventas netas: ' + usd(totals.sales) + ' · Utilidad bruta: ' + usd(totals.profit) +
       ' · Margen bruto: ' + (totals.margin === null ? 'Sin datos' : totals.margin.toFixed(2) + ' %') + '</p>' +
       '<p class="small"><strong>Top 3 por utilidad bruta:</strong><br>' + rows('profit') + '</p>' +
       '<p class="small"><strong>Top 3 por margen bruto:</strong><br>' + rows('margin') +
-      '</p><p class="small">Estas tablas se recalculan al cambiar filtros o cargar datos. Úsalas para contrastar cualquier recomendación de IA.</p></div>';
+      '</p><p class="small"><strong>Top 3 por unidades vendidas (no confundir con utilidad):</strong><br>' + topline +
+      '</p><p class="small"><strong>Participación de ventas por segmento:</strong> ' + rankedDimensions('segment') +
+      '</p><p class="small"><strong>Participación de ventas por ciudad:</strong> ' + rankedDimensions('city') +
+      '</p><p class="small">Estas cifras se recalculan al cambiar filtros o cargar datos. La IA solo formula hipótesis; verifica cada afirmación en las tablas.</p></div>';
     return '<div class="note warning">La IA genera propuestas que el equipo debe contrastar con las tablas. Su respuesta no sustituye los indicadores ni demuestra causalidad.</div>' + verifiedRanks +
       card('IA mediante Cloudflare Workers AI', 'No descarga modelos en tu equipo y no necesita claves de API en el navegador.',
         '<div class="airow"><span class="tag" id="aiStatus">' + esc(status) + '</span>' +
@@ -125,5 +134,5 @@
       if (current === 'assistant') render();
     }
   };
-  window.CrustRemoteAI = { provider: 'Cloudflare Workers AI', endpoint: ENDPOINT, version: 'V2.1' };
+  window.CrustRemoteAI = { provider: 'Cloudflare Workers AI', endpoint: ENDPOINT, version: 'V2.2' };
 })();
