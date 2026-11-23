@@ -11,7 +11,15 @@
     const status = aiReply && !/no se completó|No hay una recomendación validada/i.test(aiReply)
       ? 'Última consulta respondida; pendiente de revisión crítica'
       : 'Servicio remoto configurado · Consulta por validar';
-    return '<div class="note warning">La IA genera propuestas que el equipo debe contrastar con las tablas. Su respuesta no sustituye los indicadores ni demuestra causalidad.</div>' +
+    const catalog = new Map(D.products.map(p => [p.id, p]));
+    const topThree = (metric, formatter) => rank(filtered, 'pid', metric).slice(0, 3)
+      .map((r, i) => (i + 1) + '. ' + esc(productLabel(catalog.get(r.key))) + ' — ' + formatter(r))
+      .join('<br>');
+    const usd = n => new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(n / 100);
+    const verifiedRanks = '<div class="note"><strong>Referencias verificadas por cálculos del dashboard (no por IA)</strong>' +
+      '<p class="small"><strong>Mayor utilidad bruta:</strong><br>' + topThree('profit', r => usd(r.profit)) + '</p>' +
+      '<p class="small"><strong>Mayor margen bruto:</strong><br>' + topThree('margin', r => r.margin.toFixed(2) + ' %') + '</p></div>';
+    return '<div class="note warning">La IA genera propuestas que el equipo debe contrastar con las tablas. Su respuesta no sustituye los indicadores ni demuestra causalidad.</div>' + verifiedRanks +
       card('IA mediante Cloudflare Workers AI', 'No descarga modelos en tu equipo y no necesita claves de API en el navegador.',
         '<div class="airow"><span class="tag" id="aiStatus">' + esc(status) + '</span>' +
         '<span class="small">Solo se envían cifras agregadas de la selección; sin datos personales ni filas individuales.</span></div>' +
@@ -35,6 +43,31 @@
         '<button class="btn" id="saveReview" style="margin-top:12px">Guardar revisión crítica</button>' +
         '<p class="caption">La respuesta del modelo no se presenta como validada automáticamente.</p>');
   };
+  // Rankings deterministas, calculados de los registros filtrados, no inventados por IA.
+  const compactContextBase = compactContext;
+  compactContext = function (question = '') {
+    const context = compactContextBase(question);
+    const productsById = new Map(D.products.map(p => [p.id, p]));
+    const listing = (metric) => rank(filtered, 'pid', metric)
+      .filter(p => p[metric] !== null && Number.isFinite(p[metric]))
+      .slice(0, 8)
+      .map((p, index) => ({
+        puesto: index + 1,
+        producto: productLabel(productsById.get(p.key)),
+        ventasNetasUSD: Number((p.sales / 100).toFixed(2)),
+        utilidadBrutaUSD: Number((p.profit / 100).toFixed(2)),
+        margenBrutoPct: Number(p.margin.toFixed(3))
+      }));
+    context.rankingProductosPorUtilidadBrutaUSD = listing('profit');
+    context.rankingProductosPorMargenBrutoPct = listing('margin');
+    context.rankingProductosPorVentasNetasUSD = listing('sales');
+    context.instruccionesParaRankings =
+      'Las listas rankingProductosPor... están ORDENADAS de mayor a menor; los puestos son verificables. ' +
+      'Para cualquier top 3 copia exactamente los puestos 1, 2 y 3 de la lista del indicador solicitado. ' +
+      'No confundas margen en porcentaje con utilidad en USD. Si no hay datos para una afirmación, dilo.';
+    return context;
+  };
+
   askAI = async function () {
     if (aiBusy || !filtered.length) return;
     const input = byId('question');
