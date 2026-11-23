@@ -7,6 +7,18 @@
   const initialQuestion = '¿Cuáles son las ventas netas y la utilidad bruta del período, y qué decisión comercial debería evaluar?';
   let currentQuestion = initialQuestion;
   pages.assistant = ['Asistente de IA', 'Consultas comerciales con un modelo en Cloudflare y datos agregados del filtro activo.'];
+  // Evidencia calculada por el dashboard; la IA no determina los KPI ni los rankings.
+  function commercialAnchors(question = '') {
+    if (!filtered.length) return [];
+    const decisions = evidence().decisions;
+    const q = String(question).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    let ids = [0, 3]; // Sucursal de menor contribución y segmento candidato.
+    if (/producto|pizza|margen|precio|rentab|costo/.test(q)) ids = [1, 2];
+    else if (/sucursal|ciudad|local|tienda/.test(q)) ids = [0, 4];
+    else if (/cliente|segmento|estudiante|familiar|profesional/.test(q)) ids = [3, 0];
+    return ids.map(i => decisions[i]).filter(Boolean);
+  }
+
   assistantView = function () {
     const status = aiReply && !/no se completó|No hay una recomendación validada/i.test(aiReply)
       ? 'Última consulta respondida; pendiente de revisión crítica'
@@ -33,7 +45,11 @@
       '</p><p class="small"><strong>Participación de ventas por segmento:</strong> ' + rankedDimensions('segment') +
       '</p><p class="small"><strong>Participación de ventas por ciudad:</strong> ' + rankedDimensions('city') +
       '</p><p class="small">Estas cifras se recalculan al cambiar filtros o cargar datos. La IA solo formula hipótesis; verifica cada afirmación en las tablas.</p></div>';
-    return '<div class="note warning">La IA genera propuestas que el equipo debe contrastar con las tablas. Su respuesta no sustituye los indicadores ni demuestra causalidad.</div>' + verifiedRanks +
+    const anchors = commercialAnchors(currentQuestion);
+    const anchorPanel = '<div class="note"><strong>Evidencias para fundamentar propuestas</strong><p class="small">Calculadas según el filtro activo; no generadas por IA.</p>' +
+      anchors.map((a, i) => '<p class="small"><strong>' + (i + 1) + '. ' + esc(a.title) + ':</strong> ' + esc(a.text) +
+      '<br><strong>Cómo verificar:</strong> ' + esc(a.measure) + '</p>').join('') + '</div>';
+    return '<div class="note warning">La IA genera propuestas que el equipo debe contrastar con las tablas. Su respuesta no sustituye los indicadores ni demuestra causalidad.</div>' + verifiedRanks + anchorPanel +
       card('IA mediante Cloudflare Workers AI', 'No descarga modelos en tu equipo y no necesita claves de API en el navegador.',
         '<div class="airow"><span class="tag" id="aiStatus">' + esc(status) + '</span>' +
         '<span class="small">Solo se envían cifras agregadas de la selección; sin datos personales ni filas individuales.</span></div>' +
@@ -89,12 +105,14 @@
     const context = JSON.stringify(compactContext(question));
     if (context.length > 12000) { toast('El contexto es demasiado extenso para el servicio.'); return; }
     const version = dataVersion, scope = JSON.stringify(selection());
+    const anchors = commercialAnchors(question);
+    const anchorText = anchors.map((a,i)=>'Evidencia ' + String.fromCharCode(65+i) + ': '+ a.title+'. '+a.text+' Validación: '+a.measure).join(' ');
     const advisoryQuestion =
-      'Pregunta original del usuario: ' + question.slice(0, 440) + '\n' +
-      'El dashboard ya presenta cifras exactas y clasificaciones verificadas junto a esta consulta. ' +
-      'Genera SOLO dos propuestas comerciales concretas expresadas como HIPÓTESIS, con una validación para cada una. ' +
-      'NO enumeres productos por posición, NO repitas nombres como un ranking, NO redactes importes, porcentajes ni otras cifras. ' +
-      'No inventes causas; reconoce qué datos faltan. Formato: Propuesta A, Qué comprobar; Propuesta B, Qué comprobar.';
+      ('Redacta solo dos ACCIONES COMERCIALES ESPECÍFICAS (A y B), cada una vinculada a su correspondiente evidencia calculada. ' +
+      'Incluye: acción, indicador que la respalda, hipótesis y prueba propuesta. No inventes causas ni afirmes eficacia probada. ' +
+      'No escribas números, importes, porcentajes, rankings ni cuotas: esos valores están en el panel verificable. ' +
+      'Usa nombres de producto, sucursal o segmento solo si aparecen exactamente en las evidencias. ' +
+      anchorText + ' Pregunta original: ' + question.slice(0, 150)).slice(0, 1000);
     aiBusy = true;
     input.disabled = true;
     byId('askAI').disabled = true;
@@ -134,5 +152,5 @@
       if (current === 'assistant') render();
     }
   };
-  window.CrustRemoteAI = { provider: 'Cloudflare Workers AI', endpoint: ENDPOINT, version: 'V2.2' };
+  window.CrustRemoteAI = { provider: 'Cloudflare Workers AI', endpoint: ENDPOINT, version: 'V2.3' };
 })();
