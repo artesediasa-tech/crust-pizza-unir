@@ -29,9 +29,10 @@ function setup(){
  const aside=document.querySelector('aside');
  if(aside&&!document.getElementById('mobileNavWrap')){
    const wrap=document.createElement('div');wrap.id='mobileNavWrap';
-   wrap.innerHTML='<label for="mobileNav">Sección</label><select id="mobileNav" aria-label="Sección del dashboard"></select>';
+   wrap.innerHTML='<label for="mobileNav">Sección</label><select id="mobileNav" aria-label="Sección del dashboard"></select><button type="button" id="mobileHelp" aria-label="Abrir glosario de indicadores" title="Glosario">?</button>';
    aside.appendChild(wrap);
    wrap.querySelector('select').addEventListener('change',e=>navigate(e.target.value));
+   wrap.querySelector('#mobileHelp').addEventListener('click',()=>document.getElementById('guideDialog')?.showModal());
  }
  if(aside&&!document.getElementById('helpGlossary')){
    const btn=document.createElement('button');btn.id='helpGlossary';btn.className='helpbtn';btn.type='button';
