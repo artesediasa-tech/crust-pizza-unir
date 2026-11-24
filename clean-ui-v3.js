@@ -93,6 +93,22 @@ function home(page){
    if(redundant.some(t=>(c.querySelector('.cardhead h2')?.textContent||'').includes(t)))c.remove();
  }
  for(const grid of [...page.querySelectorAll('.grid')])if(!grid.querySelector('.card'))grid.remove();
+ const pmap=new Map(D.products.map(p=>[p.id,p]));
+ const bestProduct=rank(filtered,'pid','units').slice(0,3);
+ const city=rank(filtered,'city','sales')[0];
+ const branch=rank(filtered,'branch','sales')[0];
+ const segment=rank(filtered,'segment','sales')[0];
+ if(bestProduct.length&&city&&branch&&segment){
+   const compact=document.createElement('section');compact.className='card compact-overview';
+   compact.innerHTML='<div class="cardhead"><div><h2>Panorama comercial</h2><p>Los resultados principales de la selección, sin repetir todas las tablas.</p></div></div>'+
+   '<div class="quick-metrics">'+
+   '<div><strong>Productos más vendidos · unidades</strong><span>'+bestProduct.map((x,i)=>(i+1)+'. '+esc(productLabel(pmap.get(x.key)))+' ('+num(x.units)+')').join('<br>')+'</span></div>'+
+   '<div><strong>Ciudad de mayor venta</strong><span>'+esc(city.key)+'<small>'+cash(city.sales)+'</small></span></div>'+
+   '<div><strong>Sucursal de mayor venta</strong><span>'+esc(branch.key)+'<small>'+cash(branch.sales)+'</small></span></div>'+
+   '<div><strong>Segmento de mayor venta</strong><span>'+esc(segment.key)+'<small>'+cash(segment.sales)+'</small></span></div>'+
+   '</div>';
+   page.appendChild(compact);
+ }
  const links=document.createElement('div');links.className='quicklinks';
  links.innerHTML='<span class="quicklead">Continuar el análisis</span>'+
    '<button type="button" data-jump="products">Productos y márgenes</button>'+
