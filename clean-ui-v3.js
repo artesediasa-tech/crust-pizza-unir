@@ -2,7 +2,9 @@
 (function(){
 'use strict';
 let filtersExpanded=false;
-const captions={summary:'Inicio',branches:'Sucursales',products:'Productos',segments:'Clientes',findings:'Hallazgos y decisiones',assistant:'Asistente IA',data:'Cargar datos',method:'Ayuda y fuentes'};
+const team=[['Carla Viviana Barreno Albán','vivibarreno5@gmail.com'],['José Luis Santoliva Bermeo','josesantoliva@gmail.com'],['Gema Monserrate Vera Chilán','gema.elivera@hotmail.com'],['Carlos Gustavo Solórzano Macías','cargus.96@hotmail.com']];
+pages.about=['Acerca del proyecto','Actividad 1 · Lote 6 · Grupo 2 · Universidad Internacional de La Rioja'];
+const captions={about:'Acerca de',summary:'Inicio',branches:'Sucursales',products:'Productos',segments:'Clientes',findings:'Hallazgos y decisiones',assistant:'Asistente IA',data:'Cargar datos',method:'Ayuda y fuentes'};
 function syncFilters(){
   const box=document.querySelector('.filters'),btn=document.getElementById('filtersToggle');
   if(!box||!btn)return;
@@ -148,7 +150,64 @@ function improve(){
  if(['branches','products','segments'].includes(current))page.querySelector('.kpis')?.remove();
  details(page);
 }
+
+function aboutPage(){
+  const teamCards=team.map(([name,email])=>'<article class="about-person"><span class="about-avatar" aria-hidden="true">'+name.split(' ').map(w=>w[0]).slice(0,2).join('')+'</span><div><strong>'+esc(name)+'</strong><small>Maestrante · Lote 6, Grupo 2</small><a href="mailto:'+esc(email)+'">'+esc(email)+'</a></div></article>').join('');
+  return '<section class="about-hero"><div class="about-overline">ACTIVIDAD 1 · UNIR · MAESTRÍA EN DIRECCIÓN COMERCIAL Y VENTAS</div>'+
+  '<h2>De datos comerciales a decisiones fundamentadas.</h2><p>San Francisco Crust Pizza · Sistema Inteligente de Apoyo a la Toma de Decisiones Comerciales. Una solución académica que integra ventas, clientes y productos para evaluar rentabilidad, oportunidades y riesgos.</p>'+
+  '<div class="about-meta"><span>Asignatura: Sistemas de Información para la Toma de Decisiones Comerciales</span><span>Lote 6 · Grupo 2</span></div></section>'+
+  '<div class="about-sections"><section class="about-section"><header><span class="about-index">01</span><div><h2>El caso en tres pasos</h2><p>Qué problema resolvemos y cómo se utiliza el sistema</p></div></header>'+
+  '<div class="about-steps"><article><b>01 · RETO</b><h3>Datos dispersos</h3><p>La dirección dependía de reportes en Excel y necesitaba identificar tendencias, oportunidades y problemas.</p></article>'+
+  '<article><b>02 · SOLUCIÓN</b><h3>Dashboard interactivo</h3><p>Relacionamos ventas, clientes y productos; incorporamos indicadores, filtros, actualización de datos y un asistente de IA.</p></article>'+
+  '<article><b>03 · DECISIÓN</b><h3>Evidencia verificable</h3><p>El equipo contrasta las recomendaciones con las cifras antes de formular decisiones comerciales.</p></article></div></section>'+
+  '<section class="about-section"><header><span class="about-index">02</span><div><h2>Equipo académico</h2><p>Integrantes identificados en la entrega común</p></div></header><div class="about-team">'+teamCards+'</div></section>'+
+  '<section class="about-section"><header><span class="about-index">03</span><div><h2>Qué puedes hacer</h2><p>Las cinco funciones esenciales para presentar la actividad</p></div></header>'+
+  '<div class="about-features"><button data-nav="summary"><strong>Explorar indicadores</strong><small>Ventas, utilidad, margen, clientes, ticket y transacciones</small></button>'+
+  '<button data-nav="products"><strong>Analizar productos</strong><small>Ventas, volumen y rentabilidad por referencia</small></button>'+
+  '<button data-nav="branches"><strong>Comparar sucursales</strong><small>Identificar mejor y peor desempeño</small></button>'+
+  '<button data-nav="data"><strong>Actualizar ventas</strong><small>Cargar Excel o CSV sin modificar el código</small></button>'+
+  '<button data-nav="assistant"><strong>Consultar la IA</strong><small>Obtener propuestas y revisarlas críticamente</small></button></div></section>'+
+  '<section class="about-section"><header><span class="about-index">04</span><div><h2>Ficha técnica y metodología</h2><p>Arquitectura real, fuentes y limitaciones del proyecto</p></div></header>'+
+  '<div class="about-tech"><div><span>Publicación</span><strong>GitHub Pages</strong><small>Aplicación web de acceso público</small></div>'+
+  '<div><span>Interfaz y cálculos</span><strong>HTML, CSS y JavaScript</strong><small>Indicadores calculados localmente sobre los registros</small></div>'+
+  '<div><span>Datos de entrada</span><strong>Ventas · Clientes · Productos</strong><small>Excel/CSV, relaciones y validaciones antes de importar</small></div>'+
+  '<div><span>Asistente IA</span><strong>Cloudflare Workers AI</strong><small>Recomendaciones con agregaciones del filtro activo</small></div></div>'+
+  '<div class="about-method"><strong>Interpretación responsable:</strong> utilidad bruta no equivale a beneficio neto; el ticket es aproximado por VentaID, no por pedido completo; la IA plantea hipótesis que deben verificarse. La carga de archivos es local y se mantiene durante la sesión.</div>'+
+  '<div class="about-links"><a href="https://github.com/artesediasa-tech/crust-pizza-unir" target="_blank" rel="noopener noreferrer">Ver repositorio y código fuente</a><button data-nav="method">Ver definiciones y fuentes</button></div></section></div>';
+}
+function renderAbout(){
+  document.body.classList.add('about-mode');
+  byId('nav').innerHTML=Object.entries(pages).map(([k,v],i)=>'<button class="'+(k===current?'active':'')+'" data-nav="'+k+'" '+(k===current?'aria-current="page"':'')+'><span>'+String(i+1).padStart(2,'0')+'</span><span>'+esc(v[0])+'</span></button>').join('');
+  byId('pageTitle').textContent='Acerca del proyecto';
+  byId('pageSubtitle').textContent='Actividad 1 · UNIR · Lote 6 · Grupo 2';
+  byId('page').innerHTML=aboutPage();
+  setup();nav();
+}
+function welcome(page){
+  if(page.querySelector('.welcome-hero'))return;
+  const m=agg(filtered);
+  const hero=document.createElement('section');
+  hero.className='welcome-hero';
+  hero.innerHTML='<div class="welcome-content"><span class="welcome-overline">CRUST PIZZA · INTELIGENCIA COMERCIAL</span>'+
+    '<h2>Las cifras cuentan la historia. <em>Decidamos con evidencia.</em></h2>'+
+    '<p>Explora el desempeño de la cadena, compara la rentabilidad y detecta oportunidades con datos de ventas, productos y clientes.</p>'+
+    '<div class="welcome-actions"><button class="welcome-primary" data-nav="findings">Ver hallazgos comerciales</button><button class="welcome-secondary" data-nav="assistant">Consultar al asistente IA</button></div>'+
+    '<div class="welcome-stats"><span><b>'+num(m.transactions)+'</b><small>transacciones analizadas</small></span><span><b>'+num(m.customers)+'</b><small>clientes compradores</small></span><span><b>'+num(D.products.length)+'</b><small>referencias en catálogo</small></span></div></div>'+
+    '<div class="welcome-graphic" aria-hidden="true"><div class="pizza-graphic"><i></i><i></i><i></i><i></i><i></i></div><div class="graphic-label">VENTAS <span>→</span> ANÁLISIS <span>→</span> DECISIONES</div></div>';
+  page.prepend(hero);
+  const guide=document.createElement('section');guide.className='quick-guide';
+  guide.innerHTML='<div class="quick-guide-title"><strong>Cómo usar el sistema</strong><span>Tu recorrido en tres pasos</span></div>'+
+    '<div class="quick-guide-list"><button data-nav="summary"><b>1</b><span><strong>Explora</strong><small>Revisa los indicadores y filtra los datos</small></span></button>'+
+    '<button data-nav="branches"><b>2</b><span><strong>Compara</strong><small>Analiza sucursales, productos y segmentos</small></span></button>'+
+    '<button data-nav="assistant"><b>3</b><span><strong>Decide</strong><small>Contrasta propuestas de la IA con evidencia</small></span></button></div>';
+  hero.insertAdjacentElement('afterend',guide);
+  const kpiTitle=document.createElement('div');kpiTitle.className='kpi-heading';
+  kpiTitle.innerHTML='<h2>Indicadores clave</h2><p>Cifras del período seleccionado · selecciona filtros para actualizar resultados</p>';
+  const k=page.querySelector('.kpis');if(k)k.parentNode.insertBefore(kpiTitle,k);
+  const brand=document.querySelector('.brandmark');if(brand){brand.innerHTML='<svg width="27" height="27" viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M8 7Q26 0 43 10L25 43Z" fill="#F4B85A" stroke="#F7D59D" stroke-width="3"/><path d="M8 7Q26 0 43 10" stroke="#DA7142" stroke-width="8" stroke-linecap="round"/><circle cx="24" cy="18" r="4" fill="#A63D33"/><circle cx="32" cy="28" r="4" fill="#A63D33"/><path d="m19 30 6-4" stroke="#2F7E55" stroke-width="3" stroke-linecap="round"/></svg>';brand.title='San Francisco Crust Pizza';}
+}
+
 const originalRender=render;
-render=function(){originalRender();improve();};
-improve();
+render=function(){if(current==='about'){renderAbout();return;}document.body.classList.remove('about-mode');originalRender();improve();if(current==='summary')welcome(byId('page'));};
+render();
 })();
