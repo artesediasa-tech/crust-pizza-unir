@@ -4,7 +4,7 @@
   'use strict';
   const ENDPOINT = 'https://crust-pizza-ai.artesediasa.workers.dev/';
   const MODEL_LABEL = 'Cloudflare Workers AI · Llama 3.1 8B';
-  const initialQuestion = '¿Cuáles son las ventas netas y la utilidad bruta del período, y qué decisión comercial debería evaluar?';
+  const initialQuestion = '¿Qué dos decisiones comerciales recomendarías para el período seleccionado y cómo verificarías su viabilidad?';
   let currentQuestion = initialQuestion;
   pages.assistant = ['Asistente de IA', 'Consultas comerciales con un modelo en Cloudflare y datos agregados del filtro activo.'];
   // Evidencia calculada por el dashboard; la IA no determina los KPI ni los rankings.
@@ -130,15 +130,15 @@
       if (!response.ok) throw new Error(payload.error || ('Error HTTP ' + response.status));
       const answer = typeof payload.respuesta === 'string' ? payload.respuesta.trim() : '';
       if (!answer) throw new Error('El modelo no devolvió una respuesta de texto.');
-      // Proteger los datos auditables: el modelo solo aporta hipótesis, nunca cifras.
-      if (/[\$€%]/.test(answer) || /\b\d+[.,]\d{2,}\b/.test(answer) || /\b(?:USD|EUR)\b/i.test(answer)) {
-        aiReply = 'La IA intentó introducir cifras o porcentajes que no pueden validarse automáticamente. Se omite esa respuesta. Consulta únicamente los resultados verificados de arriba y repite la solicitud de propuestas sin cifras.';
-        aiReplyScope = 'Respuesta de IA rechazada por incluir afirmaciones numéricas; no utilizar como evidencia.';
-      } else {
-        aiReply = 'HIPÓTESIS Y ACCIONES GENERADAS POR IA (pendientes de revisión del equipo):\n\n' + answer;
-        aiReplyScope = 'Modelo: ' + MODEL_LABEL + ' · Filtros: ' + scope + ' · Pregunta original: ' + question +
-          ' · Las cifras y los rankings provienen exclusivamente del cálculo determinista.';
-      }
+      // El modelo puede mencionar importes o porcentajes no verificables.
+      // NO sustituir su respuesta por un error: mostrarla como borrador para revisión crítica.
+      // Únicamente los KPI calculados desde los registros constituyen evidencia cuantitativa.
+      const hasNumericalClaims = /[\$€%]/.test(answer) || /\b\d+[.,]\d{2,}\b/.test(answer) || /\b(?:USD|EUR)\b/i.test(answer);
+      aiReply = (hasNumericalClaims
+        ? 'BORRADOR GENERADO POR IA · CONTIENE CIFRAS SIN VALIDAR.\nLas cifras mencionadas por el modelo NO son evidencia. Contrástalas con los indicadores y rankings calculados arriba; corrige o descarta las afirmaciones que no coincidan.\n\n'
+        : 'HIPÓTESIS Y ACCIONES GENERADAS POR IA (pendientes de revisión del equipo):\n\n') + answer;
+      aiReplyScope = 'Modelo: ' + MODEL_LABEL + ' · Filtros: ' + scope + ' · Pregunta original: ' + question +
+        ' · Las cifras verificadas provienen exclusivamente del cálculo determinista. Toda afirmación de IA requiere revisión crítica.';
       aiVersion = version;
       modelName = MODEL_LABEL;
 
@@ -152,5 +152,5 @@
       if (current === 'assistant') render();
     }
   };
-  window.CrustRemoteAI = { provider: 'Cloudflare Workers AI', endpoint: ENDPOINT, version: 'V2.3' };
+  window.CrustRemoteAI = { provider: 'Cloudflare Workers AI', endpoint: ENDPOINT, version: 'V2.4' };
 })();
